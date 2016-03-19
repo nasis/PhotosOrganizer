@@ -9,4 +9,7 @@ class Timer(object):
         self.__finish = time.time()
 
     def duration_in_seconds(self):
-        return self.__finish - self.__start
+        if hasattr(self, '__start'):
+            return self.__finish - self.__start
+        else:
+            return "Timer was not started"
