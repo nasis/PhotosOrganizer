@@ -115,12 +115,12 @@ def find_rename_candidates(result):
     return (candidates, others)
 
 
-def find_folder_duplicates(file_duplicates, hashed_paths):
+def find_folder_duplicates(file_duplicates, hashed_paths, threshold):
 
     # candidates = []
     others = dict()
 
-    ignore_list = [".picasa.ini"]
+    ignore_list = [".picasa.ini", "Thumbs.db"]
 
     # pre-processing, match each path with all the files it contains
     folderhash = dict()
@@ -154,7 +154,7 @@ def find_folder_duplicates(file_duplicates, hashed_paths):
             files_b = folderhash[folder_b]
             inter = files_a.intersection(files_b)
             symmdiff = files_a.symmetric_difference(files_b)
-            if len(symmdiff) > 0 and float(len(inter)) / max(len(files_a), len(files_b)) > 0.9:
+            if len(symmdiff) > 0 and float(len(inter)) / max(len(files_a), len(files_b)) > threshold:
                 partial_folder_duplicates.add((folder_a, folder_b))
             # if a single file in this duplicate set is not matched list all of it
             else:
@@ -165,15 +165,39 @@ def find_folder_duplicates(file_duplicates, hashed_paths):
 
     return (folder_duplicates, partial_folder_duplicates, others)
 
+# def convert_to_human(unicoded_file, filename):
+#     with open(unicoded_file, "r") as input:
+#         lines = input.readlines()
+#         with open(filename, "w") as output:
+#             for line in lines:
+#                 print >> output, line
+
+def sort_folders_by_duplicate_count(file_duplicates):
+    # sort_others
+    sorted_others = dict()
+    for key in file_duplicates:
+        filenames = list(file_duplicates[key])
+        for i in xrange(0, len(filenames) - 1):
+            for j in xrange(i + 1, len(filenames)):
+                a = os.path.dirname(filenames[i])
+                b = os.path.dirname(filenames[j])
+                path_pair = (a, b) if len(a) <= len(b) else (b, a)
+                if not path_pair in sorted_others:
+                    sorted_others[path_pair] = 0
+                sorted_others[path_pair] = sorted_others[path_pair] + 1
+    import operator
+    sorted_others = sorted(sorted_others.items(), key=operator.itemgetter(1), reverse=True)
+    return sorted_others
+
 
 if __name__ == "__main__":
 
-    do_hashfiles = True
+    do_hashfiles = False
     is_debug = True
     hasher = hashlib.md5
 
     root_path = ur"Z:\Dropbox (Dropbox Team)\תמונות גיבוי"
-    files_list_path = r"c:\temp\hashed_files_list_phase2.txt"
+    files_list_path = r"c:\temp\hashed_files_list_phase3.txt"
     # root_path = ur'C:\\Users\nir\Desktop\test'
     # files_list_path = r"c:\temp\hashed_files_list2.txt"
 
@@ -186,7 +210,7 @@ if __name__ == "__main__":
         hashed_path = read_result_from_file(files_list_path)
 
     duplicates = find_duplicates(hashed_path)
-    (delete_candidates, others) = find_delete_candidates(duplicates)
+    (delete_candidates, file_duplicates) = find_delete_candidates(duplicates)
 
     for filename in delete_candidates:
         print 'delete ' + filename
@@ -196,7 +220,7 @@ if __name__ == "__main__":
             except Exception, e:
                 print e
 
-    (rename_candidates, others) = find_rename_candidates(others)
+    (rename_candidates, file_duplicates) = find_rename_candidates(file_duplicates)
     for (first, second) in rename_candidates:
         print 'rename ' + first + ' ' + first.replace('(1)', '')
         print 'delete ' + second
@@ -207,7 +231,7 @@ if __name__ == "__main__":
             except Exception, e:
                 print e
 
-    (folder_duplicates, partial_folder_duplicates, others) = find_folder_duplicates(others, hashed_path)
+    (folder_duplicates, partial_folder_duplicates, file_duplicates) = find_folder_duplicates(file_duplicates, hashed_path, 0.6)
     print "Folder " + str(len(folder_duplicates))
     for key in folder_duplicates:
         print "Folder " + key
@@ -220,10 +244,17 @@ if __name__ == "__main__":
         print '\t' + first
         print '\t' + second
 
-    print "Others " + str(len(others))
-    for key in others:
+    sorted_others = sort_folders_by_duplicate_count(file_duplicates)
+    print "Sorted others " + str(len(sorted_others))
+    for ((patha, pathb), count)in sorted_others:
+        print count
+        print patha
+        print pathb
+
+    print "Others " + str(len(file_duplicates))
+    for key in file_duplicates:
         print key
-        for name in others[key]:
+        for name in file_duplicates[key]:
             print '\t' + name
 
     print timer.duration_in_seconds()
